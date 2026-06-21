@@ -49,8 +49,40 @@
 <script src="js/shared_ui.js"></script>
 
 <script>
+// グローバルエラーをページ上部に表示（デバッグ用）
+window.onerror = function (message, source, lineno) {
+  var d = document.getElementById('debugBanner');
+  if (!d) {
+    d = document.createElement('div');
+    d.id = 'debugBanner';
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#b04a3a;' +
+      'color:#fff;font-size:12px;padding:8px;z-index:99999;white-space:pre-wrap;';
+    document.body.appendChild(d);
+  }
+  d.appendChild(document.createTextNode('JSエラー: ' + message + ' @' + lineno + '\n'));
+  return false;
+};
+</script>
+
+<script>
 (function () {
   var isSignUpMode = false;
+
+  // 起動時チェック：firebaseとconfigが読めているか
+  function startupCheck() {
+    var box = document.getElementById('errorBox');
+    if (typeof firebase === 'undefined') {
+      box.innerHTML = 'Firebase SDKが読み込めていません（ネット/CDN問題の可能性）';
+      box.className = 'km-error km-show';
+      return;
+    }
+    try {
+      dbInitFirebase();
+    } catch (e) {
+      box.innerHTML = 'Firebase初期化エラー: ' + (e && e.message ? e.message : e);
+      box.className = 'km-error km-show';
+    }
+  }
 
   function showError(message) {
     var box = document.getElementById('errorBox');
@@ -114,9 +146,18 @@
       window.location.href = 'dashboard.html';
     }).catch(function (error) {
       uiForceHideLoading();
-      showError(authErrorMessage(error));
+      var msg = authErrorMessage(error);
+      var rawCode = '';
+      if (error && error.code) {
+        rawCode = error.code;
+      } else if (error && error.message) {
+        rawCode = error.message;
+      }
+      showError(msg + '（詳細: ' + rawCode + '）');
     });
   }
+
+  startupCheck();
 
   // 既にログイン済みならダッシュボードへ
   authOnStateChanged(function (user) {
