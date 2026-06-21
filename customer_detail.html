@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>カルテマップ - 顧客</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="km-header">
+  <a href="customers.html" class="km-back">← 一覧</a>
+  <h1 id="pageTitle">顧客</h1>
+  <div class="km-header-right"></div>
+</div>
+
+<div class="km-container">
+
+  <!-- 表示モード -->
+  <div id="viewMode" style="display:none;">
+    <div class="km-card">
+      <div class="km-detail-row">
+        <div class="km-detail-label">氏名</div>
+        <div class="km-detail-value" id="vName"></div>
+      </div>
+      <div class="km-detail-row">
+        <div class="km-detail-label">氏名カナ</div>
+        <div class="km-detail-value" id="vNameKana"></div>
+      </div>
+      <div class="km-detail-row">
+        <div class="km-detail-label">電話番号</div>
+        <div class="km-detail-value" id="vPhone"></div>
+      </div>
+      <div class="km-detail-row">
+        <div class="km-detail-label">郵便番号</div>
+        <div class="km-detail-value" id="vPostal"></div>
+      </div>
+      <div class="km-detail-row">
+        <div class="km-detail-label">住所</div>
+        <div class="km-detail-value" id="vAddress"></div>
+      </div>
+      <div class="km-detail-row">
+        <div class="km-detail-label">メモ</div>
+        <div class="km-detail-value" id="vMemo"></div>
+      </div>
+    </div>
+
+    <div class="km-actions">
+      <button id="editBtn" class="km-btn km-btn-secondary">編集</button>
+      <button id="deleteBtn" class="km-btn km-btn-danger">削除</button>
+    </div>
+  </div>
+
+  <!-- 編集・追加モード -->
+  <div id="editMode" style="display:none;">
+    <div class="km-card">
+      <h2 id="editCardTitle">顧客を追加</h2>
+      <div id="errorBox" class="km-error"></div>
+
+      <div class="km-field">
+        <label for="fName">氏名 <span style="color:#b04a3a;">*</span></label>
+        <input type="text" id="fName" placeholder="山田 花子">
+      </div>
+
+      <div class="km-field">
+        <label for="fNameKana">氏名カナ</label>
+        <input type="text" id="fNameKana" placeholder="ヤマダ ハナコ">
+      </div>
+
+      <div class="km-field">
+        <label for="fPhone">電話番号</label>
+        <input type="tel" id="fPhone" placeholder="090-1234-5678">
+      </div>
+
+      <div class="km-field">
+        <label for="fPostal">郵便番号</label>
+        <input type="text" id="fPostal" placeholder="700-0000">
+      </div>
+
+      <div class="km-field-row">
+        <div class="km-field">
+          <label for="fPrefecture">都道府県</label>
+          <input type="text" id="fPrefecture" placeholder="岡山県">
+        </div>
+        <div class="km-field">
+          <label for="fCity">市区町村</label>
+          <input type="text" id="fCity" placeholder="岡山市北区">
+        </div>
+      </div>
+
+      <div class="km-field">
+        <label for="fAddress">番地以降</label>
+        <input type="text" id="fAddress" placeholder="丸の内1-1-1">
+      </div>
+
+      <div class="km-field">
+        <label for="fMemo">メモ</label>
+        <textarea id="fMemo" placeholder="施術内容や来店メモなど"></textarea>
+      </div>
+
+      <button id="saveBtn" class="km-btn km-btn-primary km-btn-block">保存する</button>
+      <div style="margin-top:12px;">
+        <button id="cancelBtn" class="km-btn km-btn-secondary km-btn-block">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script src="js/shared_db.js"></script>
+<script src="js/shared_auth.js"></script>
+<script src="js/shared_ui.js"></script>
+
+<script>
+(function () {
+  var customerId = null;   // nullなら新規追加モード
+  var currentData = null;
+
+  function getQueryId() {
+    var query = window.location.search;
+    if (!query) { return null; }
+    query = query.replace('?', '');
+    var pairs = query.split('&');
+    var i;
+    for (i = 0; i < pairs.length; i++) {
+      var kv = pairs[i].split('=');
+      if (kv[0] === 'id') {
+        return decodeURIComponent(kv[1] || '');
+      }
+    }
+    return null;
+  }
+
+  function showError(message) {
+    var box = document.getElementById('errorBox');
+    box.innerHTML = '';
+    box.appendChild(document.createTextNode(message));
+    box.className = 'km-error km-show';
+  }
+
+  function clearError() {
+    document.getElementById('errorBox').className = 'km-error';
+  }
+
+  function buildAddressText(c) {
+    var parts = [];
+    if (c.prefecture) { parts.push(c.prefecture); }
+    if (c.city) { parts.push(c.city); }
+    if (c.address) { parts.push(c.address); }
+    if (parts.length === 0 && c.fullAddressInput) {
+      return c.fullAddressInput;
+    }
+    return parts.join('');
+  }
+
+  function setValue(id, value) {
+    document.getElementById(id).innerHTML = uiEscape(value || '—');
+  }
+
+  function showViewMode() {
+    document.getElementById('viewMode').style.display = 'block';
+    document.getElementById('editMode').style.display = 'none';
+    document.getElementById('pageTitle').innerHTML = '顧客詳細';
+
+    setValue('vName', currentData.name);
+    setValue('vNameKana', currentData.nameKana);
+    setValue('vPhone', currentData.phone);
+    setValue('vPostal', currentData.postalCode);
+    setValue('vAddress', buildAddressText(currentData));
+    setValue('vMemo', currentData.memo);
+  }
+
+  function fillForm(data) {
+    document.getElementById('fName').value = data.name || '';
+    document.getElementById('fNameKana').value = data.nameKana || '';
+    document.getElementById('fPhone').value = data.phone || '';
+    document.getElementById('fPostal').value = data.postalCode || '';
+    document.getElementById('fPrefecture').value = data.prefecture || '';
+    document.getElementById('fCity').value = data.city || '';
+    document.getElementById('fAddress').value = data.address || '';
+    document.getElementById('fMemo').value = data.memo || '';
+  }
+
+  function showEditMode(isNew) {
+    document.getElementById('viewMode').style.display = 'none';
+    document.getElementById('editMode').style.display = 'block';
+    clearError();
+
+    if (isNew) {
+      document.getElementById('pageTitle').innerHTML = '顧客を追加';
+      document.getElementById('editCardTitle').innerHTML = '顧客を追加';
+      fillForm({});
+      // 新規追加時はキャンセルで一覧へ戻す
+      document.getElementById('cancelBtn').setAttribute('data-target', 'list');
+    } else {
+      document.getElementById('pageTitle').innerHTML = '顧客を編集';
+      document.getElementById('editCardTitle').innerHTML = '顧客を編集';
+      fillForm(currentData);
+      document.getElementById('cancelBtn').setAttribute('data-target', 'view');
+    }
+  }
+
+  function collectForm() {
+    var prefecture = document.getElementById('fPrefecture').value.trim();
+    var city = document.getElementById('fCity').value.trim();
+    var address = document.getElementById('fAddress').value.trim();
+    var fullAddressInput = (prefecture + city + address).trim();
+
+    return {
+      name: document.getElementById('fName').value.trim(),
+      nameKana: document.getElementById('fNameKana').value.trim(),
+      phone: document.getElementById('fPhone').value.trim(),
+      postalCode: document.getElementById('fPostal').value.trim(),
+      prefecture: prefecture,
+      city: city,
+      address: address,
+      fullAddressInput: fullAddressInput,
+      memo: document.getElementById('fMemo').value.trim()
+    };
+  }
+
+  function handleSave() {
+    clearError();
+    var data = collectForm();
+
+    if (!data.name) {
+      showError('氏名を入力してください。');
+      return;
+    }
+
+    uiShowLoading();
+
+    if (customerId) {
+      // 更新
+      dbUpdateCustomer(customerId, data).then(function () {
+        uiForceHideLoading();
+        uiToast('保存しました');
+        // 再読み込みして表示モードへ
+        return dbGetCustomer(customerId);
+      }).then(function (doc) {
+        if (doc && doc.exists) {
+          currentData = doc.data();
+          currentData.id = customerId;
+          showViewMode();
+        }
+      }).catch(function () {
+        uiForceHideLoading();
+        showError('保存に失敗しました。もう一度お試しください。');
+      });
+    } else {
+      // 新規追加
+      dbAddCustomer(data).then(function () {
+        uiForceHideLoading();
+        uiToast('追加しました');
+        window.location.href = 'customers.html';
+      }).catch(function () {
+        uiForceHideLoading();
+        showError('追加に失敗しました。もう一度お試しください。');
+      });
+    }
+  }
+
+  function handleDelete() {
+    var ok = window.confirm('この顧客を削除しますか？\nこの操作は取り消せません。');
+    if (!ok) {
+      return;
+    }
+    uiShowLoading();
+    dbDeleteCustomer(customerId).then(function () {
+      uiForceHideLoading();
+      uiToast('削除しました');
+      window.location.href = 'customers.html';
+    }).catch(function () {
+      uiForceHideLoading();
+      uiToast('削除に失敗しました');
+    });
+  }
+
+  function loadCustomer() {
+    uiShowLoading();
+    dbGetCustomer(customerId).then(function (doc) {
+      uiForceHideLoading();
+      if (!doc.exists) {
+        uiToast('顧客が見つかりません');
+        window.location.href = 'customers.html';
+        return;
+      }
+      currentData = doc.data();
+      currentData.id = customerId;
+      showViewMode();
+    }).catch(function () {
+      uiForceHideLoading();
+      uiToast('読み込みに失敗しました');
+    });
+  }
+
+  // イベント登録
+  document.getElementById('editBtn').addEventListener('click', function () {
+    showEditMode(false);
+  });
+  document.getElementById('deleteBtn').addEventListener('click', handleDelete);
+  document.getElementById('saveBtn').addEventListener('click', handleSave);
+  document.getElementById('cancelBtn').addEventListener('click', function () {
+    var target = this.getAttribute('data-target');
+    if (target === 'view') {
+      showViewMode();
+    } else {
+      window.location.href = 'customers.html';
+    }
+  });
+
+  authRequireLogin(function () {
+    customerId = getQueryId();
+    if (customerId) {
+      loadCustomer();
+    } else {
+      showEditMode(true);
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

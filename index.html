@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>カルテマップ - ログイン</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="km-login-wrap">
+  <div class="km-login-box">
+    <div class="km-login-logo">
+      <div class="km-logo-mark">カルテマップ</div>
+      <div class="km-logo-tag">顧客住所録とエリア分析</div>
+    </div>
+
+    <div class="km-card">
+      <h2 id="formTitle">ログイン</h2>
+      <div id="errorBox" class="km-error"></div>
+
+      <div class="km-field">
+        <label for="email">メールアドレス</label>
+        <input type="email" id="email" autocomplete="email" placeholder="you@example.com">
+      </div>
+
+      <div class="km-field">
+        <label for="password">パスワード</label>
+        <input type="password" id="password" autocomplete="current-password" placeholder="6文字以上">
+      </div>
+
+      <button id="submitBtn" class="km-btn km-btn-primary km-btn-block">ログイン</button>
+
+      <div class="km-login-toggle">
+        <span id="toggleText">アカウントをお持ちでない方は</span>
+        <a id="toggleLink">新規登録</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK (compat版：ES5環境向け) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script src="js/shared_db.js"></script>
+<script src="js/shared_auth.js"></script>
+<script src="js/shared_ui.js"></script>
+
+<script>
+(function () {
+  var isSignUpMode = false;
+
+  function showError(message) {
+    var box = document.getElementById('errorBox');
+    box.innerHTML = '';
+    box.appendChild(document.createTextNode(message));
+    box.className = 'km-error km-show';
+  }
+
+  function clearError() {
+    var box = document.getElementById('errorBox');
+    box.className = 'km-error';
+  }
+
+  function setMode(signUp) {
+    isSignUpMode = signUp;
+    var title = document.getElementById('formTitle');
+    var btn = document.getElementById('submitBtn');
+    var toggleText = document.getElementById('toggleText');
+    var toggleLink = document.getElementById('toggleLink');
+    var pw = document.getElementById('password');
+    if (signUp) {
+      title.innerHTML = '新規登録';
+      btn.innerHTML = '登録する';
+      toggleText.innerHTML = '既にアカウントをお持ちの方は';
+      toggleLink.innerHTML = 'ログイン';
+      pw.setAttribute('autocomplete', 'new-password');
+    } else {
+      title.innerHTML = 'ログイン';
+      btn.innerHTML = 'ログイン';
+      toggleText.innerHTML = 'アカウントをお持ちでない方は';
+      toggleLink.innerHTML = '新規登録';
+      pw.setAttribute('autocomplete', 'current-password');
+    }
+    clearError();
+  }
+
+  function handleSubmit() {
+    clearError();
+    var email = document.getElementById('email').value.trim();
+    var password = document.getElementById('password').value;
+
+    if (!email) {
+      showError('メールアドレスを入力してください。');
+      return;
+    }
+    if (!password) {
+      showError('パスワードを入力してください。');
+      return;
+    }
+
+    uiShowLoading();
+    var promise;
+    if (isSignUpMode) {
+      promise = authSignUp(email, password);
+    } else {
+      promise = authSignIn(email, password);
+    }
+
+    promise.then(function () {
+      uiForceHideLoading();
+      window.location.href = 'dashboard.html';
+    }).catch(function (error) {
+      uiForceHideLoading();
+      showError(authErrorMessage(error));
+    });
+  }
+
+  // 既にログイン済みならダッシュボードへ
+  authOnStateChanged(function (user) {
+    if (user) {
+      window.location.href = 'dashboard.html';
+    }
+  });
+
+  document.getElementById('submitBtn').addEventListener('click', handleSubmit);
+  document.getElementById('toggleLink').addEventListener('click', function () {
+    setMode(!isSignUpMode);
+  });
+  document.getElementById('password').addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+      handleSubmit();
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

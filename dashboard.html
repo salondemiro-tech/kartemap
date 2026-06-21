@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>カルテマップ - ダッシュボード</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="km-header">
+  <h1>カルテマップ</h1>
+  <div class="km-header-right">
+    <button id="logoutBtn" class="km-logout">ログアウト</button>
+  </div>
+</div>
+
+<div class="km-container">
+
+  <div class="km-card">
+    <div class="km-stat">
+      <div class="km-stat-num" id="customerCount">–</div>
+      <div class="km-stat-label">登録顧客数</div>
+    </div>
+  </div>
+
+  <div class="km-menu-grid">
+    <a href="customer_detail.html" class="km-menu-item">
+      <span class="km-menu-icon">＋</span>
+      顧客を追加
+    </a>
+    <a href="customers.html" class="km-menu-item">
+      <span class="km-menu-icon">☰</span>
+      顧客一覧
+    </a>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script src="js/shared_db.js"></script>
+<script src="js/shared_auth.js"></script>
+<script src="js/shared_ui.js"></script>
+
+<script>
+(function () {
+  function loadCount() {
+    uiShowLoading();
+    dbListCustomers().then(function (snapshot) {
+      uiForceHideLoading();
+      document.getElementById('customerCount').innerHTML = String(snapshot.size);
+    }).catch(function () {
+      uiForceHideLoading();
+      document.getElementById('customerCount').innerHTML = '0';
+    });
+  }
+
+  document.getElementById('logoutBtn').addEventListener('click', function () {
+    authSignOut().then(function () {
+      window.location.href = 'index.html';
+    });
+  });
+
+  authRequireLogin(function () {
+    loadCount();
+  });
+})();
+</script>
+
+</body>
+</html>

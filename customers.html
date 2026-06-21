@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>カルテマップ - 顧客一覧</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="km-header">
+  <a href="dashboard.html" class="km-back">← 戻る</a>
+  <h1>顧客一覧</h1>
+  <div class="km-header-right">
+    <a href="customer_detail.html" class="km-logout">＋ 追加</a>
+  </div>
+</div>
+
+<div class="km-container">
+
+  <div class="km-search">
+    <input type="text" id="searchInput" placeholder="氏名・住所で検索">
+  </div>
+
+  <div id="listArea"></div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script src="js/shared_db.js"></script>
+<script src="js/shared_auth.js"></script>
+<script src="js/shared_ui.js"></script>
+
+<script>
+(function () {
+  var allCustomers = [];
+
+  function buildAddressText(c) {
+    var parts = [];
+    if (c.prefecture) { parts.push(c.prefecture); }
+    if (c.city) { parts.push(c.city); }
+    if (c.address) { parts.push(c.address); }
+    if (parts.length === 0 && c.fullAddressInput) {
+      return c.fullAddressInput;
+    }
+    return parts.join('');
+  }
+
+  function renderList(customers) {
+    var area = document.getElementById('listArea');
+    area.innerHTML = '';
+
+    if (customers.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'km-empty';
+      empty.innerHTML =
+        '<div class="km-empty-icon">📋</div>' +
+        '<p>まだ顧客が登録されていません。</p>' +
+        '<a href="customer_detail.html" class="km-btn km-btn-primary">最初の顧客を追加</a>';
+      area.appendChild(empty);
+      return;
+    }
+
+    var i;
+    for (i = 0; i < customers.length; i++) {
+      var c = customers[i];
+      var a = document.createElement('a');
+      a.className = 'km-list-item';
+      a.href = 'customer_detail.html?id=' + encodeURIComponent(c.id);
+
+      var addr = buildAddressText(c);
+      var sub = addr;
+      if (c.phone) {
+        if (sub) {
+          sub = sub + '　/　' + c.phone;
+        } else {
+          sub = c.phone;
+        }
+      }
+
+      a.innerHTML =
+        '<div class="km-list-name">' + uiEscape(c.name || '(名前未入力)') + '</div>' +
+        '<div class="km-list-sub">' + uiEscape(sub || '住所・電話未入力') + '</div>';
+      area.appendChild(a);
+    }
+  }
+
+  function applySearch() {
+    var q = document.getElementById('searchInput').value.trim().toLowerCase();
+    if (!q) {
+      renderList(allCustomers);
+      return;
+    }
+    var filtered = [];
+    var i;
+    for (i = 0; i < allCustomers.length; i++) {
+      var c = allCustomers[i];
+      var hay = (
+        (c.name || '') + ' ' +
+        (c.nameKana || '') + ' ' +
+        buildAddressText(c) + ' ' +
+        (c.phone || '')
+      ).toLowerCase();
+      if (hay.indexOf(q) !== -1) {
+        filtered.push(c);
+      }
+    }
+    renderList(filtered);
+  }
+
+  function loadCustomers() {
+    uiShowLoading();
+    dbListCustomers().then(function (snapshot) {
+      uiForceHideLoading();
+      allCustomers = [];
+      snapshot.forEach(function (doc) {
+        var data = doc.data();
+        data.id = doc.id;
+        allCustomers.push(data);
+      });
+      renderList(allCustomers);
+    }).catch(function () {
+      uiForceHideLoading();
+      uiToast('読み込みに失敗しました');
+    });
+  }
+
+  document.getElementById('searchInput').addEventListener('input', applySearch);
+
+  authRequireLogin(function () {
+    loadCustomers();
+  });
+})();
+</script>
+
+</body>
+</html>
