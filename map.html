@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>カルテマップ - 顧客マップ</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  /* 地図はこの画面専用なので直書き */
+  #mapArea {
+    width: 100%;
+    height: 70vh;
+    min-height: 360px;
+    border: 1px solid #e6ddcf;
+    border-radius: 12px;
+    background: #efe7d9;
+  }
+  .km-map-status {
+    font-size: 13px;
+    color: #7a6a54;
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div class="km-header">
+  <a href="dashboard.html" class="km-back">← 戻る</a>
+  <h1>顧客マップ</h1>
+  <div class="km-header-right"></div>
+</div>
+
+<div class="km-container">
+
+  <div id="statusArea" class="km-map-status">地図を準備しています…</div>
+  <div id="mapArea"></div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script src="js/shared_db.js"></script>
+<script src="js/shared_auth.js"></script>
+<script src="js/shared_ui.js"></script>
+
+<script>
+(function () {
+  var map = null;
+  var geocoder = null;
+  var allCustomers = [];
+  var bounds = null;
+  var markerCount = 0;
+
+  // 岡山市中心あたりを初期表示の中心に
+  var DEFAULT_CENTER = { lat: 34.6618, lng: 133.9344 };
+
+  function setStatus(text) {
+    var el = document.getElementById('statusArea');
+    if (el) {
+      el.innerHTML = '';
+      el.appendChild(document.createTextNode(text));
+    }
+  }
+
+  function buildFullAddress(c) {
+    if (c.fullAddressInput) {
+      return c.fullAddressInput;
+    }
+    var parts = [];
+    if (c.prefecture) { parts.push(c.prefecture); }
+    if (c.city) { parts.push(c.city); }
+    if (c.address) { parts.push(c.address); }
+    return parts.join('');
+  }
+
+  // 1人分のピンを地図に立てる
+  function placeMarker(c, lat, lng) {
+    var pos = { lat: lat, lng: lng };
+    var marker = new google.maps.Marker({
+      position: pos,
+      map: map,
+      title: c.name || ''
+    });
+    var addr = buildFullAddress(c);
+    var html = '<div style="font-size:13px;">' +
+      '<strong>' + uiEscape(c.name || '(名前未入力)') + '</strong><br>' +
+      uiEscape(addr);
+    if (c.phone) {
+      html += '<br>' + uiEscape(c.phone);
+    }
+    html += '</div>';
+    var info = new google.maps.InfoWindow({ content: html });
+    marker.addListener('click', function () {
+      info.open(map, marker);
+    });
+    bounds.extend(pos);
+    markerCount = markerCount + 1;
+  }
+
+  // Geocodingを順番に処理する（レート制限対策で1件ずつ間隔をあける）
+  function geocodeQueue(queue, index, onDone) {
+    if (index >= queue.length) {
+      onDone();
+      return;
+    }
+    var c = queue[index];
+    var addr = buildFullAddress(c);
+    setStatus('住所を地図に変換中… (' + (index + 1) + '/' + queue.length + ')');
+
+    if (!addr) {
+      // 住所が無い人はスキップ
+      geocodeNext(queue, index, onDone);
+      return;
+    }
+
+    geocoder.geocode({ address: addr, region: 'jp' }, function (results, status) {
+      if (status === 'OK' && results && results[0]) {
+        var loc = results[0].geometry.location;
+        var lat = loc.lat();
+        var lng = loc.lng();
+        placeMarker(c, lat, lng);
+        // 座標をFirestoreに保存して次回から再利用
+        dbSaveGeocode(c.id, lat, lng).catch(function () {
+          // 保存失敗してもピンは表示済みなので続行
+        });
+      }
+      // OVER_QUERY_LIMITなら少し長めに待つ
+      var delay = 250;
+      if (status === 'OVER_QUERY_LIMIT') {
+        delay = 1500;
+      }
+      setTimeout(function () {
+        geocodeNext(queue, index, onDone);
+      }, delay);
+    });
+  }
+
+  function geocodeNext(queue, index, onDone) {
+    geocodeQueue(queue, index + 1, onDone);
+  }
+
+  function renderCustomers() {
+    bounds = new google.maps.LatLngBounds();
+    markerCount = 0;
+    var needGeocode = [];
+    var i;
+
+    // 既に座標がある人は即ピン、無い人はGeocode待ち行列へ
+    for (i = 0; i < allCustomers.length; i++) {
+      var c = allCustomers[i];
+      if (typeof c.lat === 'number' && typeof c.lng === 'number') {
+        placeMarker(c, c.lat, c.lng);
+      } else {
+        needGeocode.push(c);
+      }
+    }
+
+    if (needGeocode.length === 0) {
+      finishRender();
+      return;
+    }
+
+    geocodeQueue(needGeocode, 0, finishRender);
+  }
+
+  function finishRender() {
+    if (markerCount === 0) {
+      setStatus('地図に表示できる住所がありませんでした。顧客の住所を登録してください。');
+      map.setCenter(DEFAULT_CENTER);
+      map.setZoom(11);
+      return;
+    }
+    setStatus(markerCount + '件の顧客を地図に表示しました。ピンをタップすると詳細が出ます。');
+    map.fitBounds(bounds);
+    // ピンが1件だけだと拡大しすぎるので調整
+    if (markerCount === 1) {
+      map.setZoom(15);
+    }
+  }
+
+  function loadAndRender() {
+    uiShowLoading();
+    dbListCustomers().then(function (snapshot) {
+      uiForceHideLoading();
+      allCustomers = [];
+      snapshot.forEach(function (doc) {
+        var data = doc.data();
+        data.id = doc.id;
+        allCustomers.push(data);
+      });
+      if (allCustomers.length === 0) {
+        setStatus('顧客がまだ登録されていません。');
+        map.setCenter(DEFAULT_CENTER);
+        map.setZoom(11);
+        return;
+      }
+      renderCustomers();
+    }).catch(function () {
+      uiForceHideLoading();
+      setStatus('顧客の読み込みに失敗しました。');
+    });
+  }
+
+  // Google Maps APIが読み込まれたら呼ばれるコールバック
+  window.kmInitMap = function () {
+    map = new google.maps.Map(document.getElementById('mapArea'), {
+      center: DEFAULT_CENTER,
+      zoom: 11,
+      mapTypeControl: false,
+      streetViewControl: false
+    });
+    geocoder = new google.maps.Geocoder();
+
+    // 認証完了後にデータ読み込み
+    authRequireLogin(function () {
+      loadAndRender();
+    });
+  };
+
+  // Maps APIの読み込み失敗時
+  window.gm_authFailure = function () {
+    uiForceHideLoading();
+    setStatus('地図の読み込みに失敗しました。APIキーの設定をご確認ください。');
+  };
+})();
+</script>
+
+<!-- Google Maps JavaScript API（callbackでkmInitMapを呼ぶ） -->
+<script async
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDfloQD_Qwo5JkolJMe-d9RbILqjL36z7A&callback=kmInitMap">
+</script>
+
+</body>
+</html>
