@@ -34,6 +34,24 @@ function dbGetAuth() {
   return firebase.auth();
 }
 
+/* Functionsインスタンスを取得（東京リージョン） */
+function dbGetFunctions() {
+  dbInitFirebase();
+  return firebase.app().functions('asia-northeast1');
+}
+
+/* カルテ画像をOCRする（Cloud Functionsのextract KarteDataを呼ぶ）
+ * imageBase64: base64文字列（data URLプレフィックスなし）
+ * mimeType: 'image/jpeg' など
+ * 戻り値: Promise（成功時は {name, nameKana, phone, postalCode, prefecture, city, address}）
+ */
+function dbExtractKarteData(imageBase64, mimeType) {
+  var fn = dbGetFunctions().httpsCallable('extractKarteData');
+  return fn({ imageBase64: imageBase64, mimeType: mimeType }).then(function (result) {
+    return result.data;
+  });
+}
+
 /* 現在ログイン中ユーザーのUIDを返す（未ログインならnull） */
 function dbGetCurrentUid() {
   var user = dbGetAuth().currentUser;
