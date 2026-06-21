@@ -22,6 +22,14 @@
     <input type="text" id="searchInput" placeholder="氏名・住所で検索">
   </div>
 
+  <div id="csvArea" style="display:none; margin-bottom:14px;">
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button id="csvFudemameBtn" class="km-btn km-btn-secondary" style="flex:1; min-width:200px;">CSV出力（筆まめ用）</button>
+      <button id="csvUtf8Btn" class="km-btn km-btn-secondary" style="flex:1; min-width:200px;">CSV出力（iPad確認用）</button>
+    </div>
+    <div class="km-hint" style="margin-top:6px;">筆まめ用はShift_JIS、iPad確認用はUTF-8で出力します。</div>
+  </div>
+
   <div id="listArea"></div>
 
 </div>
@@ -30,9 +38,13 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
+<!-- Shift_JIS変換用ライブラリ -->
+<script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.2.0/encoding.min.js"></script>
+
 <script src="js/shared_db.js"></script>
 <script src="js/shared_auth.js"></script>
 <script src="js/shared_ui.js"></script>
+<script src="js/shared_csv.js"></script>
 
 <script>
 (function () {
@@ -122,13 +134,56 @@
         allCustomers.push(data);
       });
       renderList(allCustomers);
+      // 顧客が1件以上あればCSV出力エリアを表示
+      var csvArea = document.getElementById('csvArea');
+      if (allCustomers.length > 0) {
+        csvArea.style.display = 'block';
+      } else {
+        csvArea.style.display = 'none';
+      }
     }).catch(function () {
       uiForceHideLoading();
       uiToast('読み込みに失敗しました');
     });
   }
 
+  function handleCsvFudemame() {
+    if (allCustomers.length === 0) {
+      uiToast('出力する顧客がいません');
+      return;
+    }
+    var ok = window.confirm('筆まめ用CSV（Shift_JIS）をダウンロードします。\nファイル名: kartemap_customers_fudemame.csv');
+    if (!ok) {
+      return;
+    }
+    try {
+      csvDownloadFudemame(allCustomers);
+      uiToast('筆まめ用CSVを出力しました');
+    } catch (e) {
+      uiToast('CSV出力に失敗しました');
+    }
+  }
+
+  function handleCsvUtf8() {
+    if (allCustomers.length === 0) {
+      uiToast('出力する顧客がいません');
+      return;
+    }
+    var ok = window.confirm('iPad確認用CSV（UTF-8）をダウンロードします。\nファイル名: kartemap_customers_utf8.csv');
+    if (!ok) {
+      return;
+    }
+    try {
+      csvDownloadUtf8(allCustomers);
+      uiToast('iPad確認用CSVを出力しました');
+    } catch (e) {
+      uiToast('CSV出力に失敗しました');
+    }
+  }
+
   document.getElementById('searchInput').addEventListener('input', applySearch);
+  document.getElementById('csvFudemameBtn').addEventListener('click', handleCsvFudemame);
+  document.getElementById('csvUtf8Btn').addEventListener('click', handleCsvUtf8);
 
   authRequireLogin(function () {
     loadCustomers();
