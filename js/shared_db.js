@@ -7,12 +7,12 @@
  */
 
 var KARTEMAP_FIREBASE_CONFIG = {
-  apiKey: '[YOUR_FIREBASE_API_KEY]',
-  authDomain: '[YOUR_PROJECT_ID].firebaseapp.com',
-  projectId: '[YOUR_PROJECT_ID]',
-  storageBucket: '[YOUR_PROJECT_ID].appspot.com',
-  messagingSenderId: '[YOUR_SENDER_ID]',
-  appId: '[YOUR_APP_ID]'
+  apiKey: 'AIzaSyCmPdkLJBZGWrPFD0e21AV78Vu0G_VEYYo',
+  authDomain: 'kartemap-371bc.firebaseapp.com',
+  projectId: 'kartemap-371bc',
+  storageBucket: 'kartemap-371bc.firebasestorage.app',
+  messagingSenderId: '684742259483',
+  appId: '1:684742259483:web:22116b3d134164c0cbd9be'
 };
 
 /* Firebaseアプリを初期化（多重初期化を防ぐ） */
