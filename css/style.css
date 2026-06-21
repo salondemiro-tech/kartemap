@@ -1,0 +1,389 @@
+/* style.css
+ * カルテマップ 共通スタイル
+ * 配色：TORITAに合わせたベージュ/クリーム/ブラウン系
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans',
+    'Hiragino Kaku Gothic ProN', 'Noto Sans JP', Meiryo, sans-serif;
+  background: #f7f3ec;
+  color: #4a3d2f;
+  -webkit-text-size-adjust: 100%;
+  line-height: 1.6;
+}
+
+/* ===== ヘッダー ===== */
+.km-header {
+  background: #fff;
+  border-bottom: 1px solid #e6ddcf;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.km-header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #8a6a47;
+  letter-spacing: 0.04em;
+}
+
+.km-header .km-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.km-back {
+  color: #8a6a47;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.km-logout {
+  background: none;
+  border: 1px solid #cdbfa8;
+  color: #8a6a47;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.km-logout:hover {
+  background: #f0e9dc;
+}
+
+/* ===== コンテナ ===== */
+.km-container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+}
+
+/* ===== カード ===== */
+.km-card {
+  background: #fff;
+  border: 1px solid #e6ddcf;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.km-card h2 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  color: #6f5638;
+}
+
+/* ===== フォーム ===== */
+.km-field {
+  margin-bottom: 14px;
+}
+
+.km-field label {
+  display: block;
+  font-size: 13px;
+  color: #7a6a54;
+  margin-bottom: 5px;
+}
+
+.km-field input,
+.km-field textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #d8ccb8;
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: inherit;
+  color: #4a3d2f;
+  background: #fffdf9;
+}
+
+.km-field input:focus,
+.km-field textarea:focus {
+  outline: none;
+  border-color: #a87f5c;
+  box-shadow: 0 0 0 3px rgba(168, 127, 92, 0.15);
+}
+
+.km-field textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+.km-field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.km-field-row .km-field {
+  flex: 1;
+}
+
+/* ===== ボタン ===== */
+.km-btn {
+  display: inline-block;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  font-family: inherit;
+}
+
+.km-btn-primary {
+  background: #a87f5c;
+  color: #fff;
+}
+
+.km-btn-primary:hover {
+  background: #936c4b;
+}
+
+.km-btn-block {
+  width: 100%;
+}
+
+.km-btn-secondary {
+  background: #efe7d9;
+  color: #6f5638;
+}
+
+.km-btn-secondary:hover {
+  background: #e6dac6;
+}
+
+.km-btn-danger {
+  background: #fff;
+  color: #b04a3a;
+  border: 1px solid #d9a89e;
+}
+
+.km-btn-danger:hover {
+  background: #fbf0ee;
+}
+
+.km-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== エラーメッセージ ===== */
+.km-error {
+  background: #fbeae7;
+  color: #b04a3a;
+  border: 1px solid #e6c1b8;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  margin-bottom: 14px;
+  display: none;
+}
+
+.km-error.km-show {
+  display: block;
+}
+
+/* ===== ダッシュボード ===== */
+.km-stat {
+  text-align: center;
+  padding: 8px 0 4px;
+}
+
+.km-stat .km-stat-num {
+  font-size: 40px;
+  font-weight: 700;
+  color: #a87f5c;
+  line-height: 1.1;
+}
+
+.km-stat .km-stat-label {
+  font-size: 13px;
+  color: #7a6a54;
+}
+
+.km-menu-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.km-menu-item {
+  background: #fff;
+  border: 1px solid #e6ddcf;
+  border-radius: 12px;
+  padding: 22px 14px;
+  text-align: center;
+  text-decoration: none;
+  color: #6f5638;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.km-menu-item:hover {
+  border-color: #a87f5c;
+  background: #fffdf9;
+}
+
+.km-menu-item .km-menu-icon {
+  font-size: 26px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* ===== 顧客一覧 ===== */
+.km-search {
+  margin-bottom: 14px;
+}
+
+.km-search input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #d8ccb8;
+  border-radius: 8px;
+  font-size: 16px;
+  background: #fffdf9;
+}
+
+.km-list-item {
+  background: #fff;
+  border: 1px solid #e6ddcf;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  text-decoration: none;
+  color: #4a3d2f;
+  display: block;
+}
+
+.km-list-item:hover {
+  border-color: #a87f5c;
+}
+
+.km-list-item .km-list-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #5a4632;
+}
+
+.km-list-item .km-list-sub {
+  font-size: 13px;
+  color: #8a7a64;
+  margin-top: 3px;
+}
+
+/* ===== 空状態 ===== */
+.km-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #9a8a72;
+}
+
+.km-empty .km-empty-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+
+.km-empty p {
+  margin: 0 0 18px;
+  font-size: 15px;
+}
+
+/* ===== 詳細表示 ===== */
+.km-detail-row {
+  display: flex;
+  padding: 11px 0;
+  border-bottom: 1px solid #f0e9dc;
+}
+
+.km-detail-row:last-child {
+  border-bottom: none;
+}
+
+.km-detail-label {
+  width: 100px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: #8a7a64;
+}
+
+.km-detail-value {
+  flex: 1;
+  font-size: 15px;
+  color: #4a3d2f;
+  word-break: break-all;
+}
+
+.km-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.km-actions .km-btn {
+  flex: 1;
+}
+
+/* ===== ログイン画面 ===== */
+.km-login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.km-login-box {
+  width: 100%;
+  max-width: 380px;
+}
+
+.km-login-logo {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.km-login-logo .km-logo-mark {
+  font-size: 32px;
+  font-weight: 700;
+  color: #8a6a47;
+  letter-spacing: 0.06em;
+}
+
+.km-login-logo .km-logo-tag {
+  font-size: 13px;
+  color: #9a8a72;
+  margin-top: 4px;
+}
+
+.km-login-toggle {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+.km-login-toggle a {
+  color: #a87f5c;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.km-hint {
+  font-size: 12px;
+  color: #9a8a72;
+  margin-top: 4px;
+}
