@@ -36,4 +36,10 @@ jobs:
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "${{ github.workspace }}/service-account.json"
 
       - name: set anthropic secret
-        run: printf '%s' '${{ secrets.ANTHROPIC_API_KEY }}' | firebase functions:secrets:set ANTHROPIC_API_KEY --project kartemap-371bc --data-file
+        run: |
+          printf '%s' '${{ secrets.ANTHROPIC_API_KEY }}' > anthropic_key.txt
+          firebase functions:secrets:set ANTHROPIC_API_KEY --project kartemap-371bc --data-file anthropic_key.txt --force
+          rm anthropic_key.txt
+
+      - name: deploy
+        run: firebase deploy --only functions --project kartemap-371bc --non-interactive
