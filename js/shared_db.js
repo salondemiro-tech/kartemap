@@ -146,3 +146,23 @@ function dbDeleteCustomer(customerId) {
   }
   return ref.doc(customerId).delete();
 }
+
+/* Geocoding結果（緯度経度）を顧客に保存する。
+ * 一度変換した座標を再利用し、無駄なGeocodingを避けるため。
+ * customerId: ドキュメントID
+ * lat, lng: 緯度経度
+ * 戻り値: Promise
+ */
+function dbSaveGeocode(customerId, lat, lng) {
+  var ref = dbGetCustomersRef();
+  if (!ref) {
+    return Promise.reject(new Error('not_logged_in'));
+  }
+  return ref.doc(customerId).update({
+    lat: lat,
+    lng: lng,
+    geocodeStatus: 'success',
+    geocodeError: null,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
