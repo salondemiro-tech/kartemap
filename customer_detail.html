@@ -114,6 +114,12 @@
 <script src="js/shared_db.js"></script>
 <script src="js/shared_auth.js"></script>
 <script src="js/shared_ui.js"></script>
+<script src="js/shared_geo.js"></script>
+
+<!-- Geocoding（住所→郵便番号・緯度経度）用にMaps APIを読み込む -->
+<script async
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDfloQD_Qwo5JkolJMe-d9RbILqjL36z7A">
+</script>
 
 <script>
 (function () {
@@ -235,8 +241,8 @@
     uiShowLoading();
 
     if (customerId) {
-      // 更新
-      dbUpdateCustomer(customerId, data).then(function () {
+      // 更新（郵便番号・座標を補完してから保存）
+      dbSaveWithGeo(data, 'update', customerId).then(function () {
         uiForceHideLoading();
         uiToast('保存しました');
         // 再読み込みして表示モードへ
@@ -252,8 +258,8 @@
         showError('保存に失敗しました。もう一度お試しください。');
       });
     } else {
-      // 新規追加
-      dbAddCustomer(data).then(function () {
+      // 新規追加（郵便番号・座標を補完してから保存）
+      dbSaveWithGeo(data, 'add', null).then(function () {
         uiForceHideLoading();
         uiToast('追加しました');
         window.location.href = 'customers.html';
