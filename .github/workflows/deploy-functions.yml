@@ -1,0 +1,39 @@
+name: Deploy Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'functions/**'
+      - 'firebase.json'
+      - '.firebaserc'
+      - '.github/workflows/deploy-functions.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/service-account.json
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: install deps
+        run: npm install
+        working-directory: functions
+
+      - name: install firebase tools
+        run: npm install -g firebase-tools
+
+      - name: write service account
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "${{ github.workspace }}/service-account.json"
+
+      - name: set anthropic secret
+        run: printf '%s' '${{ secrets.ANTHROPIC_API_KEY }}' | firebase functions:secrets:set ANTHROPIC_API_KEY --project kartemap-371bc --data-file
