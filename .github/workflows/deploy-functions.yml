@@ -37,15 +37,6 @@ jobs:
           SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
           printf '%s' "$SA_JSON" > "${{ github.workspace }}/service-account.json"
-          node -e "JSON.parse(require('fs').readFileSync('${{ github.workspace }}/service-account.json','utf8')); console.log('service account JSON valid');"
-
-      - name: set anthropic secret
-        env:
-          ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          printf '%s' "$ANTHROPIC_KEY" > anthropic_key.txt
-          firebase functions:secrets:set ANTHROPIC_API_KEY --data-file anthropic_key.txt --force --project kartemap-371bc
-          rm anthropic_key.txt
 
       - name: deploy
         run: firebase deploy --only functions --project kartemap-371bc --non-interactive
