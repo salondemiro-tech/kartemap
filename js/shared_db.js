@@ -82,6 +82,7 @@ function dbAddCustomer(data) {
     return Promise.reject(new Error('not_logged_in'));
   }
   var now = firebase.firestore.FieldValue.serverTimestamp();
+  var hasGeo = (typeof data.lat === 'number' && typeof data.lng === 'number');
   var record = {
     name: data.name || '',
     nameKana: data.nameKana || '',
@@ -91,10 +92,10 @@ function dbAddCustomer(data) {
     city: data.city || '',
     address: data.address || '',
     fullAddressInput: data.fullAddressInput || '',
-    fullAddressNormalized: '',
-    lat: null,
-    lng: null,
-    geocodeStatus: 'manual',
+    fullAddressNormalized: data.fullAddressInput || '',
+    lat: hasGeo ? data.lat : null,
+    lng: hasGeo ? data.lng : null,
+    geocodeStatus: hasGeo ? 'success' : 'manual',
     geocodeError: null,
     ocrConfidence: null,
     sourceImagePath: null,
@@ -150,7 +151,47 @@ function dbUpdateCustomer(customerId, data) {
     memo: data.memo || '',
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
+  // 座標が渡された場合のみ更新（地図ピンと連動）
+  if (typeof data.lat === 'number' && typeof data.lng === 'number') {
+    record.lat = data.lat;
+    record.lng = data.lng;
+    record.fullAddressNormalized = data.fullAddressInput || '';
+    record.geocodeStatus = 'success';
+    record.geocodeError = null;
+  }
   return ref.doc(customerId).update(record);
+}
+
+/* 保存用データに郵便番号・緯度経度を補完してから保存する共通ヘルパー。
+ * data: collectForm()等で作った顧客データ（fullAddressInput必須）
+ * geoLookup（shared_geo.js）で住所→郵便番号・座標を取得し、
+ * 郵便番号が未入力なら補完、座標は常にセットする。
+ * mode: 'add' なら新規追加、'update' なら更新（customerId必須）
+ * 戻り値: Promise
+ */
+function dbSaveWithGeo(data, mode, customerId) {
+  // shared_geo.js が読み込まれていない場合はそのまま保存
+  if (typeof geoLookup !== 'function') {
+    if (mode === 'update') {
+      return dbUpdateCustomer(customerId, data);
+    }
+    return dbAddCustomer(data);
+  }
+  return geoLookup(data.fullAddressInput).then(function (geo) {
+    // 郵便番号が空のときだけ補完（ユーザー入力を優先）
+    if (!data.postalCode && geo.postalCode) {
+      data.postalCode = geo.postalCode;
+    }
+    // 座標は取得できたらセット
+    if (geo.status === 'success') {
+      data.lat = geo.lat;
+      data.lng = geo.lng;
+    }
+    if (mode === 'update') {
+      return dbUpdateCustomer(customerId, data);
+    }
+    return dbAddCustomer(data);
+  });
 }
 
 /* 顧客を削除する（Phase 2では画像なしのためFirestoreのみ削除）
