@@ -225,3 +225,77 @@ function dbSaveGeocode(customerId, lat, lng) {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 }
+
+/* CSVから顧客を一括インポートする
+ * rows: [{name, postalCode, fullAddressInput, address2}] の配列
+ *       （CSVパース後の行データ。address2は住所2列、空可）
+ * Firestoreのbatch writeで最大500件ずつ保存。
+ * geocodeStatusは'pending'で保存（マップ表示時に個別ジオコード）。
+ * 戻り値: Promise（成功時は保存件数）
+ */
+function dbImportCustomers(rows) {
+  var ref = dbGetCustomersRef();
+  if (!ref) {
+    return Promise.reject(new Error('not_logged_in'));
+  }
+  var db = dbGetFirestore();
+  var now = firebase.firestore.FieldValue.serverTimestamp();
+  var BATCH_SIZE = 500;
+  var batches = [];
+  var i;
+  var batch = null;
+  var countInBatch = 0;
+
+  for (i = 0; i < rows.length; i++) {
+    if (countInBatch === 0) {
+      batch = db.batch();
+    }
+    var r = rows[i];
+    var addrParts = [];
+    if (r.fullAddressInput) { addrParts.push(r.fullAddressInput); }
+    if (r.address2) { addrParts.push(r.address2); }
+    var fullAddr = addrParts.join(' ').trim();
+    var docRef = ref.doc();
+    batch.set(docRef, {
+      name: r.name || '',
+      nameKana: '',
+      phone: r.phone || '',
+      postalCode: r.postalCode || '',
+      prefecture: '',
+      city: '',
+      address: r.address2 || '',
+      fullAddressInput: fullAddr,
+      fullAddressNormalized: '',
+      lat: null,
+      lng: null,
+      geocodeStatus: 'pending',
+      geocodeError: null,
+      ocrConfidence: null,
+      sourceImagePath: null,
+      memo: r.memo || '',
+      createdAt: now,
+      updatedAt: now
+    });
+    countInBatch++;
+    if (countInBatch === BATCH_SIZE) {
+      batches.push(batch);
+      batch = null;
+      countInBatch = 0;
+    }
+  }
+  if (countInBatch > 0) {
+    batches.push(batch);
+  }
+
+  /* バッチを順番にcommit */
+  var total = rows.length;
+  function commitNext(idx) {
+    if (idx >= batches.length) {
+      return Promise.resolve(total);
+    }
+    return batches[idx].commit().then(function () {
+      return commitNext(idx + 1);
+    });
+  }
+  return commitNext(0);
+}
