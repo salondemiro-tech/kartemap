@@ -24,8 +24,8 @@
 
   <div style="margin-bottom:14px;">
     <button id="importCsvBtn" class="km-btn km-btn-secondary" style="width:100%;">📥 CSVから取り込む</button>
-    <input type="file" id="importCsvFile" accept=".csv" style="display:none;">
-    <div class="km-hint" style="margin-top:4px;">筆まめ形式（郵便番号・住所1・住所2・氏名）のCSVを取り込めます。Shift_JIS・UTF-8どちらも対応。</div>
+    <input type="file" id="importCsvFile" accept=".csv,.xls,.xlsx" style="display:none;">
+    <div class="km-hint" style="margin-top:4px;">筆まめ形式（郵便番号・住所1・住所2・氏名）のCSV・XLS・XLSXを取り込めます。</div>
   </div>
 
   <!-- インポート確認モーダル -->
@@ -58,6 +58,8 @@
 
 <!-- Shift_JIS変換用ライブラリ -->
 <script src="https://cdn.jsdelivr.net/npm/encoding-japanese@2.2.0/encoding.min.js"></script>
+<!-- XLS/XLSX読み込み用ライブラリ -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script src="js/shared_db.js"></script>
 <script src="js/shared_auth.js"></script>
@@ -274,31 +276,69 @@
     return rows;
   }
 
+  /* sheet_to_jsonで取得した2次元配列をパースする（XLS/XLSX用）
+   * 列順: 郵便番号,住所1,住所2,氏名 を想定
+   */
+  function parseSheetRows(data) {
+    var rows = [];
+    var i;
+    for (i = 0; i < data.length; i++) {
+      var cols = data[i];
+      /* ヘッダー行スキップ */
+      if (i === 0 && (String(cols[0]).indexOf('郵便') !== -1 || String(cols[0]).toLowerCase() === 'zip')) {
+        continue;
+      }
+      var name = String(cols[3] || '').trim();
+      if (!name) { continue; }
+      rows.push({
+        postalCode: String(cols[0] || '').trim().replace(/[－−]/g, '-'),
+        fullAddressInput: String(cols[1] || '').trim(),
+        address2: String(cols[2] || '').trim(),
+        name: name,
+        phone: '',
+        memo: ''
+      });
+    }
+    return rows;
+  }
+
   function handleImportCsvClick() {
     document.getElementById('importCsvFile').click();
   }
 
   function handleImportFileChange(e) {
     var file = e.target.files && e.target.files[0];
-    e.target.value = ''; /* 同じファイルを再選択できるようリセット */
+    e.target.value = '';
     if (!file) { return; }
+    var name = file.name.toLowerCase();
+    var isExcel = (name.slice(-4) === '.xls' || name.slice(-5) === '.xlsx');
     var reader = new FileReader();
     reader.onload = function (ev) {
       try {
-        var uint8arr = new Uint8Array(ev.target.result);
-        var text = decodeBytes(uint8arr);
-        var rows = parseCsvText(text);
+        var rows;
+        if (isExcel) {
+          /* SheetJSでXLS/XLSXを読む */
+          var wb = XLSX.read(ev.target.result, { type: 'array' });
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          var data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          rows = parseSheetRows(data);
+        } else {
+          /* CSV：Shift_JIS自動判定 */
+          var uint8arr = new Uint8Array(ev.target.result);
+          var text = decodeBytes(uint8arr);
+          rows = parseCsvText(text);
+        }
         if (rows.length === 0) {
           uiToast('取り込めるデータがありませんでした');
           return;
         }
         importRows = rows;
         var msg = document.getElementById('importModalMsg');
-        msg.textContent = rows.length + '件のデータが見つかりました。\nFirestoreに取り込みます。\n（ジオコード（地図ピン）はマップ表示時に自動変換します）';
+        msg.textContent = rows.length + '件のデータが見つかりました。\nFirestoreに取り込みます。\n（地図ピンはマップ表示時に自動変換します）';
         msg.style.whiteSpace = 'pre-line';
         document.getElementById('importModal').style.display = 'flex';
       } catch (err) {
-        uiToast('CSVの読み込みに失敗しました');
+        uiToast('ファイルの読み込みに失敗しました');
       }
     };
     reader.readAsArrayBuffer(file);
