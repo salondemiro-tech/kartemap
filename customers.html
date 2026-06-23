@@ -29,10 +29,12 @@
   </div>
 
   <!-- インポート確認モーダル -->
-  <div id="importModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; display:none; align-items:center; justify-content:center;">
+  <div id="importModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; align-items:center; justify-content:center;">
     <div style="background:#fff; border-radius:12px; padding:24px; max-width:340px; width:90%; margin:auto; position:relative; top:50%; transform:translateY(-50%);">
-      <h3 style="margin:0 0 12px; font-size:16px;">CSVインポート確認</h3>
-      <p id="importModalMsg" style="margin:0 0 16px; font-size:14px; line-height:1.6;"></p>
+      <h3 style="margin:0 0 12px; font-size:16px;">取り込むシートを選択</h3>
+      <p style="margin:0 0 10px; font-size:13px; color:#666;">取り込みたいシートにチェックを入れてください。</p>
+      <div id="importSheetList" style="margin-bottom:16px;"></div>
+      <p id="importModalMsg" style="margin:0 0 16px; font-size:13px; color:#888; line-height:1.5;"></p>
       <div style="display:flex; gap:10px;">
         <button id="importCancelBtn" class="km-btn km-btn-secondary" style="flex:1;">キャンセル</button>
         <button id="importExecBtn" class="km-btn km-btn-primary" style="flex:1;">取り込む</button>
@@ -203,16 +205,14 @@
 
   /* ---- CSVインポート ---- */
   var importRows = [];
+  var importWorkbook = null;
 
-  /* バイト列を文字列に変換（Shift_JIS自動判定） */
   function decodeBytes(uint8arr) {
-    /* encoding-japaneseが読み込まれている前提 */
     var detected = Encoding.detect(uint8arr);
     var unicode = Encoding.convert(uint8arr, { to: 'UNICODE', from: detected });
     return Encoding.codeToString(unicode);
   }
 
-  /* CSV1行をフィールド配列に分割（ダブルクォート対応） */
   function parseCsvLine(line) {
     var result = [];
     var cur = '';
@@ -224,27 +224,17 @@
         if (ch === '"') {
           if (line[i + 1] === '"') { cur += '"'; i++; }
           else { inQ = false; }
-        } else {
-          cur += ch;
-        }
+        } else { cur += ch; }
       } else {
-        if (ch === '"') {
-          inQ = true;
-        } else if (ch === ',') {
-          result.push(cur.trim());
-          cur = '';
-        } else {
-          cur += ch;
-        }
+        if (ch === '"') { inQ = true; }
+        else if (ch === ',') { result.push(cur.trim()); cur = ''; }
+        else { cur += ch; }
       }
     }
     result.push(cur.trim());
     return result;
   }
 
-  /* CSVテキストをパースして行データ配列に変換
-   * 対応フォーマット：郵便番号,住所1,住所2,氏名（ヘッダー行は自動スキップ）
-   */
   function parseCsvText(text) {
     var lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
     var rows = [];
@@ -253,53 +243,55 @@
       var line = lines[i].trim();
       if (!line) { continue; }
       var cols = parseCsvLine(line);
-      /* ヘッダー行スキップ（先頭列が「郵便番号」等の文字列） */
-      if (i === 0 && (cols[0] === '郵便番号' || cols[0] === 'postcode' || cols[0] === 'zip')) {
-        continue;
-      }
-      /* 氏名が空の行はスキップ */
-      var name = cols[3] || cols[0] || '';
-      /* 4列フォーマット: 郵便番号,住所1,住所2,氏名 */
-      if (cols.length >= 4) {
-        name = cols[3];
-      }
+      if (i === 0 && (cols[0] === '郵便番号' || cols[0] === 'postcode' || cols[0] === 'zip')) { continue; }
+      var name = cols.length >= 4 ? cols[3] : (cols[0] || '');
       if (!name) { continue; }
       rows.push({
         postalCode: (cols[0] || '').replace(/[－−]/g, '-'),
         fullAddressInput: cols[1] || '',
         address2: cols[2] || '',
-        name: name,
-        phone: '',
-        memo: ''
+        name: name, phone: '', memo: ''
       });
     }
     return rows;
   }
 
-  /* sheet_to_jsonで取得した2次元配列をパースする（XLS/XLSX用）
-   * 列順: 郵便番号,住所1,住所2,氏名 を想定
-   */
   function parseSheetRows(data) {
     var rows = [];
     var i;
     for (i = 0; i < data.length; i++) {
       var cols = data[i];
-      /* ヘッダー行スキップ */
-      if (i === 0 && (String(cols[0]).indexOf('郵便') !== -1 || String(cols[0]).toLowerCase() === 'zip')) {
-        continue;
-      }
+      if (i === 0 && (String(cols[0]).indexOf('郵便') !== -1 || String(cols[0]).toLowerCase() === 'zip')) { continue; }
       var name = String(cols[3] || '').trim();
       if (!name) { continue; }
       rows.push({
         postalCode: String(cols[0] || '').trim().replace(/[－−]/g, '-'),
         fullAddressInput: String(cols[1] || '').trim(),
         address2: String(cols[2] || '').trim(),
-        name: name,
-        phone: '',
-        memo: ''
+        name: name, phone: '', memo: ''
       });
     }
     return rows;
+  }
+
+  /* チェック中シートの合計件数を更新 */
+  function updateImportMsg() {
+    if (!importWorkbook) { return; }
+    var checks = document.querySelectorAll('.importSheetChk');
+    var total = 0;
+    var k;
+    for (k = 0; k < checks.length; k++) {
+      if (checks[k].checked) {
+        var ws = importWorkbook.Sheets[checks[k].value];
+        if (ws) {
+          var data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          total += parseSheetRows(data).length;
+        }
+      }
+    }
+    var msg = document.getElementById('importModalMsg');
+    msg.textContent = '合計 ' + total + ' 件を取り込みます。\n（地図ピンはマップ表示時に自動変換します）';
+    msg.style.whiteSpace = 'pre-line';
   }
 
   function handleImportCsvClick() {
@@ -310,33 +302,49 @@
     var file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file) { return; }
-    var name = file.name.toLowerCase();
-    var isExcel = (name.slice(-4) === '.xls' || name.slice(-5) === '.xlsx');
+    var fname = file.name.toLowerCase();
+    var isExcel = (fname.slice(-4) === '.xls' || fname.slice(-5) === '.xlsx');
     var reader = new FileReader();
     reader.onload = function (ev) {
       try {
-        var rows;
         if (isExcel) {
-          /* SheetJSでXLS/XLSXを読む */
           var wb = XLSX.read(ev.target.result, { type: 'array' });
-          var ws = wb.Sheets[wb.SheetNames[0]];
-          var data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-          rows = parseSheetRows(data);
+          importWorkbook = wb;
+          /* シート選択UIを構築 */
+          var listEl = document.getElementById('importSheetList');
+          listEl.innerHTML = '';
+          var s;
+          for (s = 0; s < wb.SheetNames.length; s++) {
+            var sName = wb.SheetNames[s];
+            var label = document.createElement('label');
+            label.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 0;font-size:15px;border-bottom:1px solid #eee;cursor:pointer;';
+            var chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.className = 'importSheetChk';
+            chk.value = sName;
+            chk.style.cssText = 'width:20px;height:20px;flex-shrink:0;';
+            /* 「不可」はデフォルトOFF、それ以外はON */
+            chk.checked = (sName.indexOf('不可') === -1);
+            chk.addEventListener('change', updateImportMsg);
+            label.appendChild(chk);
+            label.appendChild(document.createTextNode(sName));
+            listEl.appendChild(label);
+          }
+          updateImportMsg();
+          document.getElementById('importModal').style.display = 'flex';
         } else {
-          /* CSV：Shift_JIS自動判定 */
+          importWorkbook = null;
           var uint8arr = new Uint8Array(ev.target.result);
           var text = decodeBytes(uint8arr);
-          rows = parseCsvText(text);
+          var rows = parseCsvText(text);
+          if (rows.length === 0) { uiToast('取り込めるデータがありませんでした'); return; }
+          importRows = rows;
+          document.getElementById('importSheetList').innerHTML = '';
+          var msg = document.getElementById('importModalMsg');
+          msg.textContent = rows.length + ' 件を取り込みます。\n（地図ピンはマップ表示時に自動変換します）';
+          msg.style.whiteSpace = 'pre-line';
+          document.getElementById('importModal').style.display = 'flex';
         }
-        if (rows.length === 0) {
-          uiToast('取り込めるデータがありませんでした');
-          return;
-        }
-        importRows = rows;
-        var msg = document.getElementById('importModalMsg');
-        msg.textContent = rows.length + '件のデータが見つかりました。\nFirestoreに取り込みます。\n（地図ピンはマップ表示時に自動変換します）';
-        msg.style.whiteSpace = 'pre-line';
-        document.getElementById('importModal').style.display = 'flex';
       } catch (err) {
         uiToast('ファイルの読み込みに失敗しました');
       }
@@ -346,21 +354,40 @@
 
   function handleImportCancel() {
     importRows = [];
+    importWorkbook = null;
     document.getElementById('importModal').style.display = 'none';
   }
 
   function handleImportExec() {
-    if (importRows.length === 0) { return; }
+    var rows = [];
+    if (importWorkbook) {
+      var checks = document.querySelectorAll('.importSheetChk');
+      var k;
+      for (k = 0; k < checks.length; k++) {
+        if (checks[k].checked) {
+          var ws = importWorkbook.Sheets[checks[k].value];
+          if (ws) {
+            var data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            rows = rows.concat(parseSheetRows(data));
+          }
+        }
+      }
+    } else {
+      rows = importRows;
+    }
+    if (rows.length === 0) { uiToast('取り込むデータがありません'); return; }
     document.getElementById('importModal').style.display = 'none';
     uiShowLoading();
-    dbImportCustomers(importRows).then(function (count) {
+    dbImportCustomers(rows).then(function (count) {
       uiForceHideLoading();
       importRows = [];
+      importWorkbook = null;
       uiToast(count + '件を取り込みました');
       loadCustomers();
     }).catch(function (err) {
       uiForceHideLoading();
       importRows = [];
+      importWorkbook = null;
       uiToast('取り込みに失敗しました');
     });
   }
